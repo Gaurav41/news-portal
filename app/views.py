@@ -16,6 +16,11 @@ API_URL = os.getenv("API_BASE_URL")
 API_KEY = os.getenv("API_KEY")
 
 def index(request):
+    ''' If get request then serve index page, if post then fetch the result as per keyword and return with 
+        index page.
+        If search result is alredy exists in time interval of last 15 min then return the same. or fetch the 
+        new result and return
+    '''
     if request.user.is_authenticated:
         logged_in_user = request.user
         print("User logged in: ",logged_in_user.username)
@@ -33,13 +38,14 @@ def index(request):
 
             search_data = SearchResult.objects.filter(search=recent_searches.first())
             if recent_result.date > time_threshold:
-                print("In history")
+                # print("In history")
                 data = search_data.first().search_result
                 return render(request, "index.html",{'data':data})
             else:
                 search_data.delete()
                 recent_searches.delete()
 
+        # Fetch the new results
         data = search_news(keyword)
         if data['status']=='ok':
             sorted_articles = sorted(data['articles'], key=lambda x: x['publishedAt'],reverse=True)
@@ -67,7 +73,7 @@ def index(request):
 
 
 def search_news(keywords):
-    print("calling new API")
+    ''' Call API and return the result '''
     url = f"{API_URL}/everything?q={keywords}&from=2023-09-09&language=en&sortBy=publishedAt&pageSize=20&apiKey={API_KEY}"
     response = requests.get(url)
     print(response)
@@ -76,6 +82,7 @@ def search_news(keywords):
 
 
 def signup(request):
+    ''' Register new user and after successful registration redirect user to login page '''
     if request.method == 'POST':
         form = UserCreationForm(request.POST)
         if form.is_valid():
@@ -87,6 +94,7 @@ def signup(request):
 
 
 def login_view(request):
+    ''' login view for users to login into app '''
     if request.method == 'POST':
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
@@ -101,3 +109,5 @@ def login_view(request):
 def logout_view(request):
     logout(request)
     return redirect('login_view')
+
+
