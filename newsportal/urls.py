@@ -24,4 +24,5 @@ admin.site.index_title = "Welcome to News Portal"
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('',include("app.urls"))
+
 ]
