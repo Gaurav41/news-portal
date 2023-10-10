@@ -14,43 +14,22 @@
     </div>
 
     <div class="result-container">
-      <h2>Results</h2>
-
+      {% if data %}<h2>Results</h2> {% endif %}
+{% comment %} 
       {% if data %}
       Total Count: {{data.total_results}}
 
-      {% comment %} <div id="results">
-        <table id="dataTable">
-          <tr>
-            <th>News title</th>
-            <th>Publish Date</th>
-            <th>Source</th>
-            <th>url</th>
-          </tr>
           {% for article in data.articles %}
-          <tr>
-            <td>{{article.title}}</td>
-            <td>{{article.publishedAt}}</td>
-            <td>{{article.source.name}}</td>
-            <td><a href="{{article.url}}" target="_blank">View</a></td>
-          </tr>
+            <h3>{{ article.title }}</h3>
+            <p>{{ article.author }}, {{ article.publishedAt}}</p>
+            <p>{{ article.publishedAt|date:'F j, Y g:i A'}}</p>
+            <p>{{ article.description }}</p>
+            <a href="{{ article.url }}" target="_blank">Read more</a>
+            <hr>
           {% endfor %}
-          <!-- Add more rows as needed -->
-        </table>
+      {% endif %} {% endcomment %}
 
-      </div> {% endcomment %}
-
-      {% for article in data.articles %}
-      <h3>{{ article.title }}</h3>
-      <p>{{ article.author }}, {{ article.publishedAt}}</p>
-      <p>{{ article.publishedAt|date:'F j, Y g:i A'}}</p>
-      <p>{{ article.description }}</p>
-      <a href="{{ article.url }}" target="_blank">Read more</a>
-      <hr>
-  {% endfor %}
-  
-      <div>
-      {% endif %}
+      {% include 'search_result.html' %}
     </div>
   </div>
 {% endblock %}

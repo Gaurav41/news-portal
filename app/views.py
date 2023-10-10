@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect,get_object_or_404
 from django.http import HttpResponse
 from dotenv import load_dotenv
 import os
@@ -8,6 +8,7 @@ from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth import login, logout
 from .models import SearchHistory, SearchResult
 from django.utils import timezone
+
 
 load_dotenv()
 
@@ -80,6 +81,24 @@ def search_news(keywords):
     data = response.json()
     return data
 
+def search_history(request):
+    logged_in_user = request.user
+    searches = SearchHistory.objects.filter(user=logged_in_user).order_by('-date')
+    return render(request, 'search_history.html', {'searches': searches})
+
+
+def history_result(request, keyword):
+    history_result = SearchHistory.objects.filter(user=request.user, query=keyword)
+    search_data = SearchResult.objects.filter(search=history_result.first())
+    data = search_data.first().search_result
+    return render(request, 'view_history_result.html', {'data': data})
+
+
+def delete_search(request, keyword):
+    search = get_object_or_404(SearchHistory, query=keyword,user=request.user)
+    search.delete()
+    return redirect('search_history')
+
 
 def signup(request):
     ''' Register new user and after successful registration redirect user to login page '''
@@ -109,5 +128,4 @@ def login_view(request):
 def logout_view(request):
     logout(request)
     return redirect('login_view')
-
 

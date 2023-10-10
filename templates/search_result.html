@@ -1,0 +1,13 @@
+
+{% if data %}
+  Total Count: {{ data.total_results }}
+  <hr />
+  {% for article in data.articles %}
+    <h3>{{ article.title }}</h3>
+    <p>{{ article.author }}, {{ article.publishedAt }}</p>
+    <p>{{ article.publishedAt|date:'F j, Y g:i A' }}</p>
+    <p>{{ article.description }}</p>
+    <a href="{{ article.url }}" target="_blank">Read more</a>
+    <hr />
+  {% endfor %}
+{% endif %}
