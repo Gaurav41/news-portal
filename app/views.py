@@ -82,12 +82,14 @@ def search_news(keywords):
     return data
 
 def search_history(request):
+    ''' get the users search history from database '''
     logged_in_user = request.user
     searches = SearchHistory.objects.filter(user=logged_in_user).order_by('-date')
     return render(request, 'search_history.html', {'searches': searches})
 
 
 def history_result(request, keyword):
+    ''' show the history search result '''
     history_result = SearchHistory.objects.filter(user=request.user, query=keyword)
     search_data = SearchResult.objects.filter(search=history_result.first())
     data = search_data.first().search_result
@@ -95,6 +97,7 @@ def history_result(request, keyword):
 
 
 def delete_search(request, keyword):
+    ''' delete the history search from database '''
     search = get_object_or_404(SearchHistory, query=keyword,user=request.user)
     search.delete()
     return redirect('search_history')
