@@ -16,4 +16,4 @@ class SearchResult(models.Model):
     search = models.ForeignKey(SearchHistory, on_delete=models.CASCADE)
     search_result = models.JSONField(null=True)
     def __str__(self):
-        return f"{self.search.query} ({self.search_result['total_results']})"
+        return f"{self.search.query}"

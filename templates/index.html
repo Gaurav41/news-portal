@@ -14,7 +14,12 @@
     </div>
 
     <div class="result-container">
-      {% if data %}<h2>Results</h2> {% endif %}
+      {% if data %}<h2>Results</h2>   
+      <a href="{% url 'refresh_search' data.keyword  %}">| Refresh</a>
+
+      {% include 'search_result.html' %}
+      
+      {% endif %}
 {% comment %} 
       {% if data %}
       Total Count: {{data.total_results}}
@@ -29,7 +34,6 @@
           {% endfor %}
       {% endif %} {% endcomment %}
 
-      {% include 'search_result.html' %}
     </div>
   </div>
 {% endblock %}

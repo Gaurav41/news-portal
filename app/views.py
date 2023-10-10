@@ -39,7 +39,7 @@ def index(request):
 
             search_data = SearchResult.objects.filter(search=recent_searches.first())
             if recent_result.date > time_threshold:
-                # print("In history")
+                print("In history")
                 data = search_data.first().search_result
                 return render(request, "index.html",{'data':data})
             else:
@@ -50,7 +50,13 @@ def index(request):
         data = search_news(keyword)
         if data['status']=='ok':
             sorted_articles = sorted(data['articles'], key=lambda x: x['publishedAt'],reverse=True)
-            articles=[ {"title":article['title'],"description":article['description'],"author":article['author'],"source":article['source'],"url":article['url'],'publishedAt': datetime.fromisoformat(article['publishedAt'][:-1]).strftime('%B %d, %Y %I:%M %p')} for article in sorted_articles if article['title'] !='[Removed]'] 
+            articles=[ {"title":article['title'],
+                        "description":article['description'],
+                        "author":article['author'],
+                        "source":article['source'],
+                        "url":article['url'],
+                        "publishedAt": datetime.fromisoformat(article['publishedAt'][:-1]).strftime('%B %d, %Y %I:%M %p')} 
+                        for article in sorted_articles if article['title'] !='[Removed]'] 
             # print(sorted_articles)
             result= {
             'status':'Success',
@@ -58,16 +64,19 @@ def index(request):
             'total_results':data['totalResults'],
             'articles': articles
             }
-        else:
-            result= {
-            'status':'Failed',
-            'error':'Something went wrong, Try again later'
-            }
-        search_history = SearchHistory.objects.create(user=logged_in_user, query=keyword, date=datetime.now())
-        SearchResult.objects.create(search=search_history, 
+
+            search_history = SearchHistory.objects.create(user=logged_in_user, query=keyword, date=datetime.now())
+            SearchResult.objects.create(search=search_history, 
                                     search_result = result
                                     )
-        return render(request, "index.html",{'data':result})
+            return render(request, "index.html",{'data':result})
+        else:
+            print(data)
+            result= {
+            'status': data['status'],
+            'error':'Something went wrong, Try again later'
+            }
+            return render(request, "index.html",{'data':result})
     else:
         return render(request, "index.html",)
 
@@ -75,7 +84,8 @@ def index(request):
 
 def search_news(keywords):
     ''' Call API and return the result '''
-    url = f"{API_URL}/everything?q={keywords}&from=2023-09-09&language=en&sortBy=publishedAt&pageSize=20&apiKey={API_KEY}"
+    print("New API")
+    url = f"{API_URL}/everything?q={keywords}&from=2023-09-10&language=en&sortBy=publishedAt&pageSize=20&apiKey={API_KEY}"
     response = requests.get(url)
     print(response)
     data = response.json()
@@ -101,6 +111,46 @@ def delete_search(request, keyword):
     search = get_object_or_404(SearchHistory, query=keyword,user=request.user)
     search.delete()
     return redirect('search_history')
+
+
+def refresh_search(request, keyword):
+    ''' delete the history search from database '''
+    recent_searches = SearchHistory.objects.filter(user=request.user, query=keyword)
+    exsiting_result = SearchResult.objects.filter(search=recent_searches.first()).first()
+    if exsiting_result:
+        exsiting_search_result = exsiting_result.search_result
+        recent_news_date = exsiting_search_result['articles'][0]['publishedAt']
+        ISO_date = datetime.strptime(recent_news_date, '%B %d, %Y %I:%M %p').isoformat()
+        # all API and return the result '''
+        url = f"{API_URL}/everything?q={keyword}&from={ISO_date}&language=en&sortBy=publishedAt&pageSize=20&apiKey={API_KEY}"
+        response = requests.get(url)
+        # print(response)
+        new_results = response.json()
+        if new_results['status']=='ok' and new_results['totalResults'] > 0:
+            totalResults = new_results['totalResults']+exsiting_search_result['total_results']
+            articles=[ {"title":article['title'],
+                        "description":article['description'],
+                        "author":article['author'],
+                        "source":article['source'],
+                        "url":article['url'],
+                        "publishedAt": datetime.fromisoformat(article['publishedAt'][:-1]).strftime('%B %d, %Y %I:%M %p')} 
+                        for article in new_results['articles'] if article['title'] !='[Removed]'] 
+            articles = articles+exsiting_search_result['articles']
+            combined_result = {
+                'status':'Success',
+                'keyword':keyword,
+                'total_results':totalResults,
+                'articles': articles
+            }
+            exsiting_result.search_result = combined_result
+            exsiting_result.save()
+            recent_searches.date = datetime.now()
+        return render(request, "index.html",{'data':combined_result})
+    else:
+        return redirect('index')
+
+    
+
 
 
 def signup(request):
