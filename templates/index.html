@@ -15,7 +15,20 @@
     </div>
 
     <div class="result-container">
-      {% if data %}<h2>Results</h2>   
+      {% if search_metadata.keyword %}
+      <div>
+        <form class="" action="/get_searches/{{search_metadata.keyword}}" method="get">
+          {% csrf_token %}
+          <div>
+            <h4>Apply Filters</h4>
+          </div>
+              {{articleFilter.form}}
+              <button type="submit">Apply</button>
+        </form>
+      </div>
+      {% endif %}
+       
+      {% if data %}<h2>Results</h2>  
       <a href="{% url 'refresh_search' search_metadata.keyword %}">| Refresh</a>
       {% include 'search_result.html' %}
       {% endif %}

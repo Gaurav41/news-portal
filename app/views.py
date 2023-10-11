@@ -9,6 +9,7 @@ from django.contrib.auth import login, logout
 from .models import SearchHistory, Article
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
+from .filters import ArticleFilter
 
 
 
@@ -32,17 +33,21 @@ def index(request):
     if request.method=='POST':
         keyword = request.POST.get('keyword')
         recent_searches = SearchHistory.objects.filter(user=logged_in_user, query=keyword)
-    
+
         if recent_searches.exists():
             result=""
             recent_result = recent_searches.latest('date')
             time_threshold = timezone.now() - timedelta(minutes=15)
 
             search_data = Article.objects.filter(search=recent_searches.first()).all()
+            print("discttt: ",search_data.values_list('title', flat=True).distinct())
+
+            articleFilter = ArticleFilter(request.GET,queryset=search_data)
+            search_data = articleFilter.qs
             if recent_result.date > time_threshold:
                 print("In history")
                 metadata= recent_searches.first().metadata
-                return render(request, "index.html",{'data':search_data,"search_metadata":metadata})
+                return render(request, "index.html",{'data':search_data,"search_metadata":metadata,"articleFilter":articleFilter})
             else:
                 search_data.delete()
                 recent_searches.delete()
@@ -74,9 +79,10 @@ def index(request):
             print(articles)
             
             Article.objects.bulk_create(articles)
-
-            # print(articles)
-            return render(request, "index.html",{'data':articles,"search_metadata":metadata})
+            search_data = Article.objects.filter(search=recent_searches.first()).all()
+            articleFilter = ArticleFilter(request.GET,queryset=search_data)
+            search_data = articleFilter.qs
+            return render(request, "index.html",{'data':search_data,"search_metadata":metadata,"articleFilter":articleFilter})
         else:
             print(data)
             result= {
@@ -87,6 +93,15 @@ def index(request):
     else:
         return render(request, "index.html")
 
+
+def get_searches(request,keyword):
+    recent_searches = SearchHistory.objects.filter(user=request.user, query=keyword)
+    search_data = Article.objects.filter(search=recent_searches.first()).all()
+    articleFilter = ArticleFilter(request.GET,queryset=search_data)
+    search_data = articleFilter.qs
+    metadata= recent_searches.first().metadata
+    return render(request, "index.html",{'data':search_data,"search_metadata":metadata, "articleFilter":articleFilter})
+ 
 
 
 def search_news(keywords):
@@ -156,7 +171,9 @@ def refresh_search(request, keyword):
             recent_searches.date = datetime.now()
             recent_searches.save()
             refreshed_result = Article.objects.filter(search=recent_searches).all()
-        return render(request, "index.html",{'data':refreshed_result,'search_metadata':recent_searches.metadata})
+            articleFilter = ArticleFilter(request.GET,queryset=refreshed_result)
+            refreshed_result = articleFilter.qs
+        return render(request, "index.html",{'data':refreshed_result,'search_metadata':recent_searches.metadata,'articleFilter':articleFilter})
     else:
         return redirect('index')
 
