@@ -27,4 +27,4 @@ Basic Django Application
 3. https://newsapi.org/docs
 
 # Approx time
-Aprrox time take to build this project - 10 hrs.
+Aprrox time take to build this project: 10-15 hrs.
