@@ -1,0 +1,24 @@
+{% extends 'core/base.html' %}
+{% block title %}Search History{% endblock %}
+{% block body %}
+  <div class="container">
+
+    <div class="result-container">
+        <h1>Search History</h1>
+        <ul>
+            {% for search in searches %}
+                <li>
+                    Keywods: {{ search.query }}<br>
+                    Time: {{ search.date }}<br>
+                    <a href="{% url 'history_result' search.query  %}">View Results</a>
+
+                    <a href="{% url 'delete_search' search.query  %}">| Delete</a>
+                    {% comment %} <a href="{% url 'search_results' search.id %}">View Results</a> {% endcomment %}
+                    
+                </li>
+            {% endfor %}
+        </ul>
+      <div>
+    </div>
+  </div>
+{% endblock %}

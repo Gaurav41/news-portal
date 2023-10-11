@@ -1,0 +1,18 @@
+.container {
+    margin: auto;
+    padding: 20px;
+}
+
+.result-container {
+    margin-top: 100px;
+    margin: auto;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+th, td {
+    border: 1px solid #ccc;
+    padding: 8px;
+    text-align: left;
+}
