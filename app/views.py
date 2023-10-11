@@ -6,9 +6,10 @@ import os
 import requests
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth import login, logout
-from .models import SearchHistory, SearchResult
+from .models import SearchHistory, Article
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
+from .filters import ArticleFilter
 
 
 
@@ -31,46 +32,66 @@ def index(request):
     
     if request.method=='POST':
         keyword = request.POST.get('keyword')
+        language = request.POST.get('language')
         recent_searches = SearchHistory.objects.filter(user=logged_in_user, query=keyword)
-    
+
         if recent_searches.exists():
             result=""
             recent_result = recent_searches.latest('date')
             time_threshold = timezone.now() - timedelta(minutes=15)
 
-            search_data = SearchResult.objects.filter(search=recent_searches.first())
-            if recent_result.date > time_threshold:
+            search_data = Article.objects.filter(search=recent_searches.first()).all()
+
+            articleFilter = ArticleFilter(request.GET,queryset=search_data)
+            search_data = articleFilter.qs
+            if recent_result.date > time_threshold and recent_searches.first().metadata['total_results'] > 0:
                 print("In history")
-                data = search_data.first().search_result
-                return render(request, "index.html",{'data':data})
+                metadata= recent_searches.first().metadata
+                return render(request, "index.html",{'data':search_data,"search_metadata":metadata,"articleFilter":articleFilter})
             else:
                 search_data.delete()
                 recent_searches.delete()
 
+
         # Fetch the new results
-        data = search_news(keyword)
+
+        # can use multiple filters here
+        query_filters = {}
+        # query_filters['keywords']=keyword
+        if language: 
+            query_filters['language']=language
+        
+        data = search_news(keyword,query_filters)
+        print(data)
         if data['status']=='ok':
-            sorted_articles = sorted(data['articles'], key=lambda x: x['publishedAt'],reverse=True)
-            articles=[ {"title":article['title'],
-                        "description":article['description'],
-                        "author":article['author'],
-                        "source":article['source'],
-                        "url":article['url'],
-                        "publishedAt": datetime.fromisoformat(article['publishedAt'][:-1]).strftime('%B %d, %Y %I:%M %p')} 
-                        for article in sorted_articles if article['title'] !='[Removed]'] 
-            # print(sorted_articles)
-            result= {
+            # sorted_articles = sorted(data['articles'], key=lambda x: x['publishedAt'],reverse=True)
+            metadata= {
             'status':'Success',
             'keyword':keyword,
-            'total_results':data['totalResults'],
-            'articles': articles
+            'query_filters':query_filters,
+            'total_results':data['totalResults']
             }
+            search_history = SearchHistory.objects.create(user=logged_in_user, query=keyword, date=datetime.now(),metadata=metadata)
 
-            search_history = SearchHistory.objects.create(user=logged_in_user, query=keyword, date=datetime.now())
-            SearchResult.objects.create(search=search_history, 
-                                    search_result = result
-                                    )
-            return render(request, "index.html",{'data':result})
+            articles=[
+                    Article(
+                    search = search_history,
+                    title=article['title'],
+                    description=article['description'],
+                    content=article['content'],
+                    author=article['author'],
+                    source=article['source'],
+                    url=article['url'],
+                    publishedAt=datetime.fromisoformat(article['publishedAt'][:-1])
+                     ) for article in data['articles'] if article['title'] !='[Removed]'
+                ]  
+            # print(articles)
+            
+            Article.objects.bulk_create(articles)
+            search_data = Article.objects.filter(search=recent_searches.first()).all()
+            articleFilter = ArticleFilter(request.GET,queryset=search_data)
+            search_data = articleFilter.qs
+            return render(request, "index.html",{'data':search_data,"search_metadata":metadata,"articleFilter":articleFilter})
         else:
             print(data)
             result= {
@@ -79,33 +100,49 @@ def index(request):
             }
             return render(request, "index.html",{'data':result})
     else:
-        return render(request, "index.html",)
+        return render(request, "index.html")
 
 
+def get_searches(request,keyword):
+    recent_searches = SearchHistory.objects.filter(user=request.user, query=keyword)
+    search_data = Article.objects.filter(search=recent_searches.first()).all()
+    articleFilter = ArticleFilter(request.GET,queryset=search_data)
+    search_data = articleFilter.qs
+    metadata= recent_searches.first().metadata
+    return render(request, "index.html",{'data':search_data,"search_metadata":metadata, "articleFilter":articleFilter})
+ 
 
-def search_news(keywords):
+
+# def search_news(keywords,language=None,publishedAt=None,_from=None, to=None):
+def search_news(keywords, query_filters):
     ''' Call API and return the result '''
     print("New API")
-    url = f"{API_URL}/everything?q={keywords}&language=en&sortBy=publishedAt&pageSize=20&apiKey={API_KEY}"
+    url = f"{API_URL}/everything?q={keywords}"
+
+    for key, value in query_filters.items():
+        url = url + f'&{key}={value}'
+    
+    # url = f"{API_URL}/everything?q={keywords}&language=en&sortBy=publishedAt&pageSize=3&apiKey={API_KEY}"
+    # keeping pageSize 100.
+    url = f"{url}&sortBy=publishedAt&pageSize=100&apiKey={API_KEY}"
+    print(url)
     response = requests.get(url)
-    print(response)
+    # print(response)
     data = response.json()
     return data
 
 @login_required()
 def search_history(request):
     ''' get the users search history from database '''
-    logged_in_user = request.user
-    searches = SearchHistory.objects.filter(user=logged_in_user).order_by('-date')
+    searches = SearchHistory.objects.filter(user=request.user).order_by('-date')
     return render(request, 'search_history.html', {'searches': searches})
 
 @login_required()
 def history_result(request, keyword):
     ''' show the history search result '''
-    history_result = SearchHistory.objects.filter(user=request.user, query=keyword)
-    search_data = SearchResult.objects.filter(search=history_result.first())
-    data = search_data.first().search_result
-    return render(request, 'view_history_result.html', {'data': data})
+    history_result = SearchHistory.objects.filter(user=request.user, query=keyword).first()
+    search_data = Article.objects.filter(search=history_result).all()
+    return render(request, 'view_history_result.html', {'data': search_data,"search_metadata":history_result.metadata})
 
 
 def delete_search(request, keyword):
@@ -115,41 +152,52 @@ def delete_search(request, keyword):
     return redirect('search_history')
 
 
-def refresh_search(request, keyword):
+def clear_search_history(request):
     ''' delete the history search from database '''
-    recent_searches = SearchHistory.objects.filter(user=request.user, query=keyword)
-    exsiting_result = SearchResult.objects.filter(search=recent_searches.first()).first()
+    SearchHistory.objects.filter(user=request.user).delete()
+    return redirect('search_history')
+
+
+def refresh_search(request, keyword):
+    ''' Refresh the search resutls. append new results to old ones  '''
+    recent_searches = SearchHistory.objects.filter(user=request.user, query=keyword).first()
+    exsiting_result = Article.objects.filter(search=recent_searches).all()
     if exsiting_result:
-        exsiting_search_result = exsiting_result.search_result
-        recent_news_date = exsiting_search_result['articles'][0]['publishedAt']
-        ISO_date = datetime.strptime(recent_news_date, '%B %d, %Y %I:%M %p').isoformat()
+        recent_article_date = exsiting_result.latest('publishedAt').publishedAt.isoformat()
+        print("recent_article_date: ",recent_article_date)
+        # ISO_date = datetime.strptime(recent_news_date.publishedAt, '%B %d, %Y %I:%M %p').isoformat()
+        print("ISO_date: ",recent_article_date)
         # all API and return the result '''
-        url = f"{API_URL}/everything?q={keyword}&from={ISO_date}&language=en&sortBy=publishedAt&pageSize=20&apiKey={API_KEY}"
-        response = requests.get(url)
-        # print(response)
-        new_results = response.json()
+        # url = f"{API_URL}/everything?q={keyword}&from={recent_article_date}&language=en&sortBy=publishedAt&pageSize=3&apiKey={API_KEY}"
+        # response = requests.get(url)
+        # new_results = response.json()
+        query_filters = recent_searches.metadata['query_filters']
+        new_results = search_news(keyword,query_filters)
+
         if new_results['status']=='ok' and new_results['totalResults'] > 0:
-            totalResults = new_results['totalResults']+exsiting_search_result['total_results']
-            articles=[ {"title":article['title'],
-                        "description":article['description'],
-                        "author":article['author'],
-                        "source":article['source'],
-                        "url":article['url'],
-                        "publishedAt": datetime.fromisoformat(article['publishedAt'][:-1]).strftime('%B %d, %Y %I:%M %p')} 
-                        for article in new_results['articles'] if article['title'] !='[Removed]'] 
-            articles = articles+exsiting_search_result['articles']
-            combined_result = {
-                'status':'Success',
-                'keyword':keyword,
-                'total_results':totalResults,
-                'articles': articles
-            }
-            exsiting_result.search_result = combined_result
-            exsiting_result.save()
+            totalResults = new_results['totalResults']+ recent_searches.metadata['total_results']
+            articles=[
+                    Article(
+                    search = recent_searches,
+                    title=article['title'],
+                    description=article['description'],
+                    content=article['content'],
+                    author=article['author'],
+                    source=article['source'],
+                    url=article['url'],
+                    publishedAt=datetime.fromisoformat(article['publishedAt'][:-1])
+                     ) for article in new_results['articles'] if article['title'] !='[Removed]'
+                ]
+            Article.objects.bulk_create(articles)
             recent_searches.date = datetime.now()
-        return render(request, "index.html",{'data':combined_result})
+            recent_searches.save()
+            refreshed_result = Article.objects.filter(search=recent_searches).all()
+            articleFilter = ArticleFilter(request.GET,queryset=refreshed_result)
+            refreshed_result = articleFilter.qs
+        return render(request, "index.html",{'data':refreshed_result,'search_metadata':recent_searches.metadata,'articleFilter':articleFilter})
     else:
         return redirect('index')
+
 
 def signup(request):
     ''' Register new user and after successful registration redirect user to login page '''
