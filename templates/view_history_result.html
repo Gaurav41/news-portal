@@ -4,7 +4,7 @@
 {% block body %}
   <div class="container">
     <div class="result-container">
-      {% if data %}<h2>Keywods: {{ data.keyword }}</h2> {% endif %}
+      {% if data %}<h2>Keywods: {{ search_metadata.keyword }}</h2> {% endif %}
       <hr/>
       {% include 'search_result.html' %}
     </div>

@@ -3,4 +3,4 @@ from .models import *
 
 # Register models here.
 admin.site.register(SearchHistory)
-admin.site.register(SearchResult)
+admin.site.register(Article)

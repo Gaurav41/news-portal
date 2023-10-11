@@ -2,24 +2,22 @@
 
 {% block body %}
 <div class="container">
-
+  
     <div>
       <form class="form-inline" action="/search/" method="POST">
         {% csrf_token %}
         <div>
           <h4>Search News here:</h4>
         </div>
-            <input type="text" id="keyword" name="keyword" value="{{data.keyword}}" required>
+            <input type="text" id="keyword" name="keyword" value="{{search_metadata.keyword}}" required>
             <button type="submit">Search</button>
       </form>
     </div>
 
     <div class="result-container">
       {% if data %}<h2>Results</h2>   
-      <a href="{% url 'refresh_search' data.keyword  %}">| Refresh</a>
-
+      <a href="{% url 'refresh_search' search_metadata.keyword %}">| Refresh</a>
       {% include 'search_result.html' %}
-      
       {% endif %}
     </div>
   </div>
