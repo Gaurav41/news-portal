@@ -1,9 +1,9 @@
 
 {% if data %}
-  Total Count: {{ data|length }}
+ 
   <hr />
   {% for article in data %}
-    <h3>{{ article.title }}</h3>
+    <h4>{{ article.title }}</h4>
     <p>{{ article.author }},{{ article.publishedAt|date:'F j, Y g:i A' }}</p>
     <p>{{ article.description }}</p>
     <a href="{{ article.url }}" target="_blank">Read more</a>

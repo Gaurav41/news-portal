@@ -3,33 +3,42 @@
 {% block body %}
 <div class="container">
   
-    <div>
-      <form class="form-inline" action="/search/" method="POST">
+    <div class="form-div">
+      <form action="/search/" method="post">
         {% csrf_token %}
-        <div>
+        <div class="heading">
           <h4>Search News here:</h4>
         </div>
-            <input type="text" id="keyword" name="keyword" value="{{search_metadata.keyword}}" required>
+            <label for="keyword">keyword: </label>
+            <input type="text" id="keyword" name="keyword" placeholder="World cup 2023" value="" required>
+            <label for="language">language: </label>
+            <input type="text" id="language" name="language" placeholder="en" }>
             <button type="submit">Search</button>
+            <button type="reset">Clear</button>
       </form>
     </div>
 
     <div class="result-container">
       {% if search_metadata.keyword %}
-      <div>
+      <div class="form-div">
         <form class="" action="/get_searches/{{search_metadata.keyword}}" method="get">
           {% csrf_token %}
-          <div>
-            <h4>Apply Filters</h4>
-          </div>
+          <div class='filters'>
+            <h5 class="center-heading">Apply Filters</h5>
+          
+            <p>
               {{articleFilter.form}}
               <button type="submit">Apply</button>
+            </p>
+          </div>
         </form>
       </div>
       {% endif %}
-       
-      {% if data %}<h2>Results</h2>  
+
+      {% if data %}<h2 class="center-heading">Search Results for {{search_metadata.keyword}}</h2> 
+      <p>Total Count: {{ data|length }} 
       <a href="{% url 'refresh_search' search_metadata.keyword %}">| Refresh</a>
+      </p>
       {% include 'search_result.html' %}
       {% endif %}
     </div>

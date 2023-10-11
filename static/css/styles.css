@@ -16,3 +16,18 @@ th, td {
     padding: 8px;
     text-align: left;
 }
+
+.form-div{
+    margin-top: 20px;
+    margin-bottom: 20px;
+    border: 1px  solid #0c0c0c;
+    padding: 10px;
+}
+
+.heading{
+    justify-content: center;
+}
+
+.center-heading{
+    text-align: center;
+}
