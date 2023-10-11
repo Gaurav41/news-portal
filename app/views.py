@@ -32,6 +32,7 @@ def index(request):
     
     if request.method=='POST':
         keyword = request.POST.get('keyword')
+        language = request.POST.get('language')
         recent_searches = SearchHistory.objects.filter(user=logged_in_user, query=keyword)
 
         if recent_searches.exists():
@@ -40,11 +41,10 @@ def index(request):
             time_threshold = timezone.now() - timedelta(minutes=15)
 
             search_data = Article.objects.filter(search=recent_searches.first()).all()
-            print("discttt: ",search_data.values_list('title', flat=True).distinct())
 
             articleFilter = ArticleFilter(request.GET,queryset=search_data)
             search_data = articleFilter.qs
-            if recent_result.date > time_threshold:
+            if recent_result.date > time_threshold and recent_searches.first().metadata['total_results'] > 0:
                 print("In history")
                 metadata= recent_searches.first().metadata
                 return render(request, "index.html",{'data':search_data,"search_metadata":metadata,"articleFilter":articleFilter})
@@ -52,15 +52,24 @@ def index(request):
                 search_data.delete()
                 recent_searches.delete()
 
+
         # Fetch the new results
-        data = search_news(keyword)
-        # print(data)
+
+        # can use multiple filters here
+        query_filters = {}
+        # query_filters['keywords']=keyword
+        if language: 
+            query_filters['language']=language
+        
+        data = search_news(keyword,query_filters)
+        print(data)
         if data['status']=='ok':
             # sorted_articles = sorted(data['articles'], key=lambda x: x['publishedAt'],reverse=True)
             metadata= {
             'status':'Success',
             'keyword':keyword,
-            'total_results':data['totalResults'],
+            'query_filters':query_filters,
+            'total_results':data['totalResults']
             }
             search_history = SearchHistory.objects.create(user=logged_in_user, query=keyword, date=datetime.now(),metadata=metadata)
 
@@ -76,7 +85,7 @@ def index(request):
                     publishedAt=datetime.fromisoformat(article['publishedAt'][:-1])
                      ) for article in data['articles'] if article['title'] !='[Removed]'
                 ]  
-            print(articles)
+            # print(articles)
             
             Article.objects.bulk_create(articles)
             search_data = Article.objects.filter(search=recent_searches.first()).all()
@@ -104,10 +113,19 @@ def get_searches(request,keyword):
  
 
 
-def search_news(keywords):
+# def search_news(keywords,language=None,publishedAt=None,_from=None, to=None):
+def search_news(keywords, query_filters):
     ''' Call API and return the result '''
     print("New API")
-    url = f"{API_URL}/everything?q={keywords}&language=en&sortBy=publishedAt&pageSize=3&apiKey={API_KEY}"
+    url = f"{API_URL}/everything?q={keywords}"
+
+    for key, value in query_filters.items():
+        url = url + f'&{key}={value}'
+    
+    # url = f"{API_URL}/everything?q={keywords}&language=en&sortBy=publishedAt&pageSize=3&apiKey={API_KEY}"
+    # keeping pageSize 100.
+    url = f"{url}&sortBy=publishedAt&pageSize=100&apiKey={API_KEY}"
+    print(url)
     response = requests.get(url)
     # print(response)
     data = response.json()
@@ -150,9 +168,12 @@ def refresh_search(request, keyword):
         # ISO_date = datetime.strptime(recent_news_date.publishedAt, '%B %d, %Y %I:%M %p').isoformat()
         print("ISO_date: ",recent_article_date)
         # all API and return the result '''
-        url = f"{API_URL}/everything?q={keyword}&from={recent_article_date}&language=en&sortBy=publishedAt&pageSize=3&apiKey={API_KEY}"
-        response = requests.get(url)
-        new_results = response.json()
+        # url = f"{API_URL}/everything?q={keyword}&from={recent_article_date}&language=en&sortBy=publishedAt&pageSize=3&apiKey={API_KEY}"
+        # response = requests.get(url)
+        # new_results = response.json()
+        query_filters = recent_searches.metadata['query_filters']
+        new_results = search_news(keyword,query_filters)
+
         if new_results['status']=='ok' and new_results['totalResults'] > 0:
             totalResults = new_results['totalResults']+ recent_searches.metadata['total_results']
             articles=[
