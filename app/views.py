@@ -8,6 +8,8 @@ from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth import login, logout
 from .models import SearchHistory, SearchResult
 from django.utils import timezone
+from django.contrib.auth.decorators import login_required
+
 
 
 load_dotenv()
@@ -16,17 +18,16 @@ load_dotenv()
 API_URL = os.getenv("API_BASE_URL")
 API_KEY = os.getenv("API_KEY")
 
+@login_required()
 def index(request):
     ''' If get request then serve index page, if post then fetch the result as per keyword and return with 
         index page.
         If search result is alredy exists in time interval of last 15 min then return the same. or fetch the 
         new result and return
     '''
-    if request.user.is_authenticated:
-        logged_in_user = request.user
-        print("User logged in: ",logged_in_user.username)
-    else:
-        return redirect('login_view')
+
+    logged_in_user = request.user
+    # print("User logged in: ",logged_in_user.username)
     
     if request.method=='POST':
         keyword = request.POST.get('keyword')
@@ -85,19 +86,20 @@ def index(request):
 def search_news(keywords):
     ''' Call API and return the result '''
     print("New API")
-    url = f"{API_URL}/everything?q={keywords}&from=2023-09-10&language=en&sortBy=publishedAt&pageSize=20&apiKey={API_KEY}"
+    url = f"{API_URL}/everything?q={keywords}&language=en&sortBy=publishedAt&pageSize=20&apiKey={API_KEY}"
     response = requests.get(url)
     print(response)
     data = response.json()
     return data
 
+@login_required()
 def search_history(request):
     ''' get the users search history from database '''
     logged_in_user = request.user
     searches = SearchHistory.objects.filter(user=logged_in_user).order_by('-date')
     return render(request, 'search_history.html', {'searches': searches})
 
-
+@login_required()
 def history_result(request, keyword):
     ''' show the history search result '''
     history_result = SearchHistory.objects.filter(user=request.user, query=keyword)
@@ -149,10 +151,6 @@ def refresh_search(request, keyword):
     else:
         return redirect('index')
 
-    
-
-
-
 def signup(request):
     ''' Register new user and after successful registration redirect user to login page '''
     if request.method == 'POST':
@@ -167,12 +165,18 @@ def signup(request):
 
 def login_view(request):
     ''' login view for users to login into app '''
+    next_page = request.GET.get('next', '')
     if request.method == 'POST':
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
             login(request, user)
-            return redirect('index')  # Redirect to your home page
+            expiration_time = datetime.now() + timedelta(minutes=30)  # Set an expiration time (adjust as needed)
+            expiration_time = expiration_time.strftime('%a, %d-%b-%Y %H:%M:%S')
+            response = redirect(next_page if next_page else 'index') 
+            response.set_cookie('user_authenticated', 'true', expires=expiration_time)
+            response.set_cookie('username', user.username, expires=expiration_time)
+            return response
     else:
         form = AuthenticationForm()
     return render(request, 'users/login.html', {'form': form})
@@ -180,5 +184,7 @@ def login_view(request):
 
 def logout_view(request):
     logout(request)
-    return redirect('login_view')
-
+    response = redirect(login_view)
+    response.delete_cookie('user_authenticated')
+    response.delete_cookie('username')
+    return response
